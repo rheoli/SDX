@@ -1,0 +1,16 @@
+============================
+ [S]ecure [D]ata E[X]change
+============================
+
+Initiate an Upload
+------------------
+Call website http://yoursite/new
+
+Upload
+------
+HTTP POST to http://yoursite/upload/params
+
+Download
+------
+HTTP GET to http://yoursite/download/params
+
