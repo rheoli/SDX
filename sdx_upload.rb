@@ -2,7 +2,7 @@
 
 require 'goliath'
 
-class AsyncUpload < Goliath::API
+class SDXUpload < Goliath::API
 
   # reload code on every request in dev environment
   use ::Rack::Reloader, 0 if Goliath.dev?
