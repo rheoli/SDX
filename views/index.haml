@@ -1,0 +1,11 @@
+!!!
+%html
+  %head
+    %title Swiss Life Secure Data Exchange
+  %body
+    %h1 Swiss Life Secure Data Exchange
+    - if @data["direction"]=="download"
+      Inform user where he can upload the files
+      %a{:href=>"/sdx/email?id=#{@id}"} Upload E-Mail
+    - if @data["direction"]=="upload"
+      Upload data:
