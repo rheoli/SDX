@@ -68,6 +68,16 @@ end
 
 
 class SdxMapNew < SdxGoliathAPI
+  
+  
+  def on_headers(env, headers)
+  end
+  
+  def on_body(env, data)
+    env.logger.info data
+    p data
+  end
+  
   def response(env)
     return [200, {}, haml(:new)] if env['REQUEST_METHOD']=="GET"      
     id=rand(999999)
