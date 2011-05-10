@@ -1,23 +1,19 @@
-!!!
-%html
-  %head
-    %title Swiss Life Secure Data Exchange
-  %body
-    %h1 Swiss Life Secure Data Exchange
-    %form{:method=>"POST"}
-      From:
-      %br/
-      %input{:type=>"text",:name=>"email_from"}
-      %br/
-      To:
-      %br/
-      %input{:type=>"text",:name=>"email_to"}
-      %br/
-      Direction:
-      %br/
-      %input{:type=>"radio",:name=>"direction",:value=>"upload"} Upload
-      %br/
-      %input{:type=>"radio",:name=>"direction",:value=>"download"} Download
-      %br/
-      %input{:type=>"submit",:value=>"Create"}
+%h1 Secure Data Exchange
+
+%form{:method=>"POST"}
+  From:
+  %br/
+  %input{:type=>"text",:name=>"email_from"}
+  %br/
+  To:
+  %br/
+  %input{:type=>"text",:name=>"email_to"}
+  %br/
+  Direction:
+  %br/
+  %input{:type=>"radio",:name=>"direction",:value=>"upload"} Upload
+  %br/
+  %input{:type=>"radio",:name=>"direction",:value=>"download"} Download
+  %br/
+  %input{:type=>"submit",:value=>"Create"}
 

@@ -8,9 +8,9 @@ Call website http://yoursite/new
 
 Upload
 ------
-HTTP POST to http://yoursite/upload/params
+HTTP POST to http://yoursite/upload?id=63663DF&ui=636364646
 
 Download
 ------
-HTTP GET to http://yoursite/download/params
+HTTP GET to http://yoursite/download?id=63663DF&ui=636364646
 
