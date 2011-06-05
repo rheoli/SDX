@@ -2,5 +2,5 @@ source "http://rubygems.org"
 
 gem 'sinatra'
 gem 'sinatra-reloader'
-gem 'goliath'
+#gem 'goliath'
 gem 'haml'

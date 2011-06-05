@@ -1,2 +1,4 @@
 data/*
 sessions/*
+.rvmrc
+Gemfile.lock
