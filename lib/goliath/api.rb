@@ -53,7 +53,7 @@ module Goliath
       # @param name [Class] The middleware class to use
       # @param args Any arguments to pass to the middeware
       # @param block A block to pass to the middleware
-      def use(name, args = nil, &block)
+      def use(name, *args, &block)
         @middlewares ||= []
         @middlewares << [name, args, block]
       end
@@ -81,6 +81,10 @@ module Goliath
       # @return [Array] array contains [path, klass, block]
       def maps
         @maps ||= []
+      end
+
+      def maps?
+        !maps.empty?
       end
 
       # Specify a router map to be used by the API
@@ -163,13 +167,14 @@ module Goliath
           end
 
         rescue Goliath::Validation::Error => e
+          env[RACK_EXCEPTION] = e
           env[ASYNC_CALLBACK].call(validation_error(e.status_code, e.message))
 
         rescue Exception => e
           env.logger.error(e.message)
           env.logger.error(e.backtrace.join("\n"))
-
-          env[ASYNC_CALLBACK].call(validation_error(400, e.message))
+          env[RACK_EXCEPTION] = e
+          env[ASYNC_CALLBACK].call(validation_error(500, e.message))
         end
       }.resume
 
