@@ -94,14 +94,49 @@ module Goliath
       #    run Proc.new {|env| [200, {"Content-Type" => "text/html"}, ["Version 0.1"]] }
       #  end
       #
-      # @param name [String] The URL path to map
+      # @example
+      #  map '/user/:id', :id => /\d+/ do
+      #    # params[:id] will be a number
+      #    run Proc.new {|env| [200, {"Content-Type" => "text/html"}, ["Loading user #{params[:id]}"]] }
+      #  end
+      #
+      # @param name [String] The URL path to map.
+      #   Optional parts are supported via <tt>(.:format)</tt>, variables as <tt>:var</tt> and globs via <tt>*remaining_path</tt>.
+      #   Variables can be validated by supplying a Regexp.
       # @param klass [Class] The class to retrieve the middlewares from
       # @param block The code to execute
-      def map(name, klass = nil, &block)
+      def map(name, *args, &block)
+        opts = args.last.is_a?(Hash) ? args.pop : {}
+        klass = args.first
         if klass && block_given?
           raise "Can't provide class and block to map"
         end
-        maps.push([name, klass, block])
+        maps.push([name, klass, opts, block])
+      end
+
+      [:get, :post, :head, :put, :delete].each do |http_method|
+        s = <<-EOT, __FILE__, __LINE__ + 1
+        def #{http_method}(name, *args, &block)
+          opts = args.last.is_a?(Hash) ? args.pop : {}
+          klass = args.first
+          opts[:conditions] ||= {}
+          opts[:conditions][:request_method] = [#{http_method == :get ? "'HEAD', 'GET'" : http_method.to_s.upcase.inspect}]
+          map(name, klass, opts, &block)
+        end
+        EOT
+        class_eval s
+      end
+
+      def router
+        unless @router
+          @router = HttpRouter.new
+          @router.default(proc{ |env|
+            env = env.dup
+            env['PATH_INFO'] = '/'
+            @router.call(env)
+          })
+        end
+        @router
       end
     end
 
@@ -145,9 +180,15 @@ module Goliath
       end
     end
 
+    # @param name [Symbol] The method to check if we respond to it.
+    # @return [Boolean] True if the API's method_missing responds to the method
+    def respond_to_missing?(name, *)
+      env.respond_to? name
+    end
+
     # {#call} is executed automatically by the middleware chain and will setup
     # the environment for the {#response} method to execute. This includes setting
-    # up a new Fiber, handing any execptions thrown from the API and executing
+    # up a new Fiber, handing any exceptions thrown from the API and executing
     # the appropriate callback method for the API.
     #
     # @param env [Goliath::Env] The request environment
