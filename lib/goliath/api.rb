@@ -124,7 +124,7 @@ module Goliath
           map(name, klass, opts, &block)
         end
         EOT
-        class_eval s
+        class_eval s[0]
       end
 
       def router

@@ -29,31 +29,19 @@ class SdxSender
   end 
 end
 
-class SdxGoliathAPI < Goliath::API
+class Sdx < Goliath::API
   include Goliath::Rack::Templates
-  use ::Rack::Reloader, 0 if Goliath.dev?
+
+  use ::Rack::Reloader
+
   use Goliath::Rack::Params
   use(Rack::Static,
-          :root => Goliath::Application.app_path("public"),
-          :urls => ["/favicon.ico", '/stylesheets', '/javascripts', '/images'])
-end
+        :root => Goliath::Application.app_path("public"),
+        :urls => ["/favicon.ico", '/stylesheets', '/javascripts', '/images'])
+  #use Goliath::Rack::DefaultMimeType    # cleanup accepted media types
+  #use Goliath::Rack::Render             # auto-negotiate response format
 
-
-class SdxMapIndex < SdxGoliathAPI
-  def response(env)
-    p env
-    @id=nil
-    @data=nil
-    @id=params["id"] if File.exists?("sessions/#{params["id"]}.yml")
-    unless @id.nil?
-      @data=YAML::load(File.open("sessions/#{@id}.yml"))
-    end
-    return [200, {}, haml(:index)]
-  end
-end
-
-class SdxMapEmail < SdxGoliathAPI
-  def response(env)
+  def email_response(env)
     @id=nil
     @data=nil
     @link=nil
@@ -64,58 +52,29 @@ class SdxMapEmail < SdxGoliathAPI
     end
     return [200, {}, haml(:email)]
   end
-end
 
-
-class SdxMapNew < SdxGoliathAPI
-  
-  
-  def on_headers(env, headers)
-  end
-  
-  def on_body(env, data)
-    env.logger.info data
-    p data
-  end
-  
-  def response(env)
-    return [200, {}, haml(:new)] if env['REQUEST_METHOD']=="GET"      
+  def new_response(env)
+    return [200, {}, haml(:new)] if env['REQUEST_METHOD']=="GET"
     id=rand(999999)
     data={}
-    p env
-    data["email_from"]=params["email_from"]
-    data["email_to"]=params["email_to"]
-    data["direction"]=params["direction"]
+    data["email_from"]=env['sdx-post-params']["email_from"]
+    data["email_to"]=env['sdx-post-params']["email_to"]
+    data["direction"]=env['sdx-post-params']["direction"]
     data["time"]=Time.now.to_i
     File.open("sessions/#{id}.yml","w") do |f|
       f.write(data.to_yaml)
     end
     return [302, {"Location"=>"/index?id=#{id}"}, "Redirect"]
   end
-end
 
-class Sdx < Goliath::API
-  include Goliath::Rack::Templates
-
-  use ::Rack::Reloader, 0 if Goliath.dev?
-
-  use Goliath::Rack::Params
-  use(Rack::Static,
-        :root => Goliath::Application.app_path("public"),
-        :urls => ["/favicon.ico", '/stylesheets', '/javascripts', '/images'])
-  #use Goliath::Rack::DefaultMimeType    # cleanup accepted media types
-  #use Goliath::Rack::Render             # auto-negotiate response format
-
-  map '/' do
-    run SdxMapIndex.new
-  end
-  
-  map '/email' do
-    run SdxMapEmail.new
-  end
-
-  map '/new' do
-    run SdxMapNew.new
+  def index_response(env)
+    @id=nil
+    @data=nil
+    @id=params["id"] if File.exists?("sessions/#{params["id"]}.yml")
+    unless @id.nil?
+      @data=YAML::load(File.open("sessions/#{@id}.yml"))
+    end
+    return [200, {}, haml(:index)]
   end
 
   def on_headers(env, headers)
@@ -144,6 +103,7 @@ class Sdx < Goliath::API
   end
 
   def on_body(env, data)
+    #print "Main Body #{data}\n"
     begin
       if env['sdx-method']=="upload"
         env['sdx-size-now']+=data.size if !data.nil?
@@ -154,6 +114,8 @@ class Sdx < Goliath::API
           env.logger.info e
         end
         return
+      elsif env['REQUEST_METHOD']=="POST"
+        env['sdx-post-params']=::Rack::Utils.parse_nested_query(data)
       end
     rescue Exception=>e
       env['sdx-method']="exception"
@@ -167,6 +129,13 @@ class Sdx < Goliath::API
   end
 
   def response(env)
+    if env['REQUEST_PATH']=="/" or env['REQUEST_PATH']=="/index"
+      p "Hallo"
+      return index_response(env)
+    end
+    if env['REQUEST_PATH']=="/new"
+      return new_response(env)
+    end
     begin
       http_ret=404
       http_msg="Not found"
