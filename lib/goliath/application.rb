@@ -1,3 +1,20 @@
+require 'goliath/goliath'
+require 'goliath/runner'
+require 'goliath/rack'
+
+# Pre-load the goliath environment so it's available as we try to parse the class.
+# This means we can use Goliath.dev? or Goliath.prod? in the use statements.
+#
+# Note, as implmented, you have to have -e as it's own flag, you can't do -sve dev
+# as it won't pickup the e flag.
+env = ENV['RACK_ENV']
+env ||= begin
+          if ((i = ARGV.index('-e')) || (i = ARGV.index('--environment')))
+            ARGV[i + 1]
+          end
+        end
+Goliath.env = env if env
+
 module Goliath
   # The main execution class for Goliath. This will execute in the at_exit
   # handler to run the server.
@@ -41,6 +58,21 @@ module Goliath
       c
     end
 
+    # Returns the userland class which inherits the Goliath API
+    #
+    # @return [String] The app class
+    def self.app_class
+      @app_class
+    end
+
+    # Sets the userland class that should use the Goliath API
+    #
+    # @param app_class [String|Symbol|Constant] The new app class
+    # @return [String] app_class The new app class
+    def self.app_class=(app_class)
+      @app_class = app_class.to_s
+    end
+
     # Retrive the base directory for the API before we've changed directories
     #
     # @note Note sure of a better way to handle this. Goliath will do a chdir
@@ -69,11 +101,18 @@ module Goliath
     #
     # @return [Nil]
     def self.run!
-      file = File.basename(app_file, '.rb')
-      klass = begin
-        Kernel.const_get(camel_case(file))
+      unless @app_class
+        file = File.basename(app_file, '.rb')
+        @app_class = camel_case(file)
+      end
+
+      begin
+        klass = Kernel
+        @app_class.split('::').each do |con|
+          klass = klass.const_get(con)
+        end
       rescue NameError
-        raise NameError, "Class #{camel_case(file)} not found."
+        raise NameError, "Class #{@app_class} not found."
       end
       api = klass.new
 
