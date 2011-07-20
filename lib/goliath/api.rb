@@ -1,7 +1,9 @@
+require 'http_router'
+require 'goliath/goliath'
 require 'goliath/response'
 require 'goliath/request'
-require 'goliath/rack/validator'
-require 'goliath/validation/error'
+require 'goliath/rack'
+require 'goliath/validation'
 
 module Goliath
   # All Goliath APIs subclass Goliath::API. All subclasses _must_ override the
@@ -21,6 +23,13 @@ module Goliath
     include Goliath::Rack::Validator
 
     class << self
+      # Catches the userland class which inherits the Goliath API
+      #
+      # In case of further subclassing, the very last class encountered is used.
+      def inherited(subclass)
+        Goliath::Application.app_class = subclass.name
+      end
+
       # Retrieves the middlewares defined by this API server
       #
       # @return [Array] array contains [middleware class, args, block]
@@ -55,6 +64,14 @@ module Goliath
       # @param block A block to pass to the middleware
       def use(name, *args, &block)
         @middlewares ||= []
+
+        if name == Goliath::Rack::Render
+          [args].flatten.each do |type|
+            type = Goliath::Rack::Formatters.const_get type.upcase
+            @middlewares << [type, nil, nil]
+          end
+        end
+
         @middlewares << [name, args, block]
       end
 
@@ -115,7 +132,7 @@ module Goliath
       end
 
       [:get, :post, :head, :put, :delete].each do |http_method|
-        s = <<-EOT, __FILE__, __LINE__ + 1
+        class_eval <<-EOT, __FILE__, __LINE__ + 1
         def #{http_method}(name, *args, &block)
           opts = args.last.is_a?(Hash) ? args.pop : {}
           klass = args.first
@@ -124,19 +141,23 @@ module Goliath
           map(name, klass, opts, &block)
         end
         EOT
-        class_eval s[0]
       end
 
       def router
         unless @router
           @router = HttpRouter.new
           @router.default(proc{ |env|
-            env = env.dup
-            env['PATH_INFO'] = '/'
-            @router.call(env)
+            @router.routes.last.dest.call(env)
           })
         end
         @router
+      end
+
+      # Use to define the 404 routing logic. As well, define any number of other paths to also run the not_found block.
+      def not_found(*other_paths, &block)
+        app = ::Rack::Builder.new(&block).to_app
+        router.default(app)
+        other_paths.each {|path| router.add(path).to(app) }
       end
     end
 
@@ -194,30 +215,28 @@ module Goliath
     # @param env [Goliath::Env] The request environment
     # @return [Goliath::Connection::AsyncResponse] An async response.
     def call(env)
-      Fiber.new {
-        begin
-          Thread.current[GOLIATH_ENV] = env
-          status, headers, body = response(env)
+      begin
+        Thread.current[GOLIATH_ENV] = env
+        status, headers, body = response(env)
 
-          if status
-            if body == Goliath::Response::STREAMING
-              env[STREAM_START].call(status, headers)
-            else
-              env[ASYNC_CALLBACK].call([status, headers, body])
-            end
+        if status
+          if body == Goliath::Response::STREAMING
+            env[STREAM_START].call(status, headers)
+          else
+            env[ASYNC_CALLBACK].call([status, headers, body])
           end
-
-        rescue Goliath::Validation::Error => e
-          env[RACK_EXCEPTION] = e
-          env[ASYNC_CALLBACK].call(validation_error(e.status_code, e.message))
-
-        rescue Exception => e
-          env.logger.error(e.message)
-          env.logger.error(e.backtrace.join("\n"))
-          env[RACK_EXCEPTION] = e
-          env[ASYNC_CALLBACK].call(validation_error(500, e.message))
         end
-      }.resume
+
+      rescue Goliath::Validation::Error => e
+        env[RACK_EXCEPTION] = e
+        env[ASYNC_CALLBACK].call(validation_error(e.status_code, e.message))
+
+      rescue Exception => e
+        env.logger.error(e.message)
+        env.logger.error(e.backtrace.join("\n"))
+        env[RACK_EXCEPTION] = e
+        env[ASYNC_CALLBACK].call(validation_error(500, e.message))
+      end
 
       Goliath::Connection::AsyncResponse
     end

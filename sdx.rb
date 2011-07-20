@@ -4,6 +4,7 @@ SDX_ROOT = "#{File.dirname(__FILE__)}" unless defined?(SDX_ROOT)
 
 $: << SDX_ROOT+"/lib"
 
+require 'yaml'
 require 'openssl'
 require 'digest/sha1'
 require 'goliath'
@@ -41,7 +42,11 @@ class Sdx < Goliath::API
   #use Goliath::Rack::DefaultMimeType    # cleanup accepted media types
   #use Goliath::Rack::Render             # auto-negotiate response format
 
-  def email_response(env)
+  def self.get(path, opts={}, &block)
+    @@cmd=[]
+  end
+
+  get "/email" do
     @id=nil
     @data=nil
     @link=nil
@@ -69,7 +74,7 @@ class Sdx < Goliath::API
 
   def index_response(env)
     @id=nil
-    @data=nil
+    @data=[]
     @id=params["id"] if File.exists?("sessions/#{params["id"]}.yml")
     unless @id.nil?
       @data=YAML::load(File.open("sessions/#{@id}.yml"))
